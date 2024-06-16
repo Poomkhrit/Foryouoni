@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Invaders</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #ffeb3b; /* Yellow background */
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        canvas {
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Make the canvas full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const playerWidth = 100;
+        const playerHeight = 100;
+        let playerX = (canvas.width - playerWidth) / 2;
+        const playerY = canvas.height - playerHeight - 10;
+        const playerSpeed = 10;
+
+        const playerImage = new Image();
+        playerImage.src = 'Oni.png';
+
+        const ammoImage = new Image();
+        ammoImage.src = 'Loveammo.png';
+
+        const enemyImage = new Image();
+        enemyImage.src = 'Idol.png';
+
+        const ammoWidth = 30;
+        const ammoHeight = 30; // Adjusted size for the new ammo
+        const ammoSpeed = 7;
+        let ammoList = [];
+
+        const enemyWidth = 100;
+        const enemyHeight = 100;
+        const enemySpeed = 2;
+        let enemyList = [];
+
+        const backgroundMusic = new Audio('background.mp3');
+        const shootingSound = new Audio('shooting.mp3');
+        backgroundMusic.loop = true;
+        backgroundMusic.play();
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const touchX = touch.clientX;
+            playerX = touchX - playerWidth / 2;
+
+            // Prevent player from moving out of bounds
+            if (playerX < 0) {
+                playerX = 0;
+            } else if (playerX > canvas.width - playerWidth) {
+                playerX = canvas.width - playerWidth;
+            }
+        }, { passive: false });
+
+        // Prevent scrolling on touch devices
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        function drawPlayer() {
+            ctx.drawImage(playerImage, playerX, playerY, playerWidth, playerHeight);
+        }
+
+        function drawAmmo() {
+            ammoList.forEach(ammo => {
+                ctx.drawImage(ammoImage, ammo.x, ammo.y, ammoWidth, ammoHeight);
+            });
+        }
+
+        function drawEnemies() {
+            enemyList.forEach(enemy => {
+                ctx.drawImage(enemyImage, enemy.x, enemy.y, enemyWidth, enemyHeight);
+            });
+        }
+
+        function update() {
+            ammoList.forEach((ammo, index) => {
+                ammo.y -= ammoSpeed * Math.cos(ammo.angle);
+                ammo.x += ammoSpeed * Math.sin(ammo.angle);
+                if (ammo.y + ammoHeight < 0 || ammo.x + ammoWidth < 0 || ammo.x > canvas.width) {
+                    ammoList.splice(index, 1);
+                }
+            });
+
+            enemyList.forEach((enemy, index) => {
+                enemy.y += enemySpeed;
+                if (enemy.y > canvas.height) {
+                    enemyList.splice(index, 1);
+                }
+            });
+
+            // Infinite pierce ammo - remove ammo on hit
+            ammoList.forEach((ammo, ammoIndex) => {
+                enemyList.forEach((enemy, enemyIndex) => {
+                    if (ammo.x < enemy.x + enemyWidth &&
+                        ammo.x + ammoWidth > enemy.x &&
+                        ammo.y < enemy.y + enemyHeight &&
+                        ammo.y + ammoHeight > enemy.y) {
+                        enemyList.splice(enemyIndex, 1);
+                        ammoList.splice(ammoIndex, 1); // Remove ammo after hit
+                    }
+                });
+            });
+
+            // Spawn new enemies
+            if (enemyList.length < 5) {
+                spawnEnemy();
+            }
+        }
+
+        function fireAmmo() {
+            const angles = [-0.5, -0.25, 0, 0.25, 0.5]; // Different angles for spread
+            angles.forEach(angle => {
+                ammoList.push({ x: playerX + playerWidth / 2 - ammoWidth / 2, y: playerY, angle: angle });
+            });
+            shootingSound.play();
+        }
+
+        function spawnEnemy() {
+            const x = Math.random() * (canvas.width - enemyWidth);
+            const y = -enemyHeight;
+            enemyList.push({ x, y });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            drawAmmo();
+            drawEnemies();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        playerImage.onload = function() {
+            gameLoop();
+        };
+
+        // Adjust canvas size on window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            playerX = (canvas.width - playerWidth) / 2;
+        });
+
+        // Automatic shooting
+        setInterval(fireAmmo, 500);
+    </script>
+</body>
+</html>
