@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Invaders</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #ffeb3b; /* Yellow background */
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        canvas {
+            border: none;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 36px;
+            color: #ff0000;
+        }
+
+        #gameOver img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOver">
+        <img src="Gameover.png" alt="Game Over">
+        <div>Game Over!</div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverScreen = document.getElementById('gameOver');
+
+        // Make the canvas full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const playerWidth = 100;
+        const playerHeight = 100;
+        let playerX = (canvas.width - playerWidth) / 2;
+        const playerY = canvas.height - playerHeight - 10;
+        const playerSpeed = 10;
+
+        const playerImage = new Image();
+        playerImage.src = 'Oni.png'; // Updated to use the Oni image
+
+        const ammoImage = new Image();
+        ammoImage.src = 'Loveammo.png';
+
+        const enemyImage = new Image();
+        enemyImage.src = 'Idol.png';
+
+        const ammoWidth = 20;
+        const ammoHeight = 20; // Adjusted size for the new ammo
+        const ammoSpeed = 7;
+        let ammoList = [];
+
+        const enemyWidth = 100;
+        const enemyHeight = 100;
+        let enemySpeed = 2;
+        let enemySpawnInterval = 2000;
+        let enemiesPerSpawn = 1;
+        let enemyList = [];
+
+        const backgroundMusic = new Audio('background.mp3');
+        const shootingSound = new Audio('shooting.mp3');
+        backgroundMusic.loop = true;
+        backgroundMusic.play();
+
+        let gameOver = false;
+        let score = 0;
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (gameOver) return;
+
+            e.preventDefault();
+            const touch = e.touches[0];
+            const touchX = touch.clientX;
+            playerX = touchX - playerWidth / 2;
+
+            // Prevent player from moving out of bounds
+            if (playerX < 0) {
+                playerX = 0;
+            } else if (playerX > canvas.width - playerWidth) {
+                playerX = canvas.width - playerWidth;
+            }
+        }, { passive: false });
+
+        // Prevent scrolling on touch devices
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        function drawPlayer() {
+            ctx.drawImage(playerImage, playerX, playerY, playerWidth, playerHeight);
+        }
+
+        function drawAmmo() {
+            ammoList.forEach(ammo => {
+                ctx.drawImage(ammoImage, ammo.x, ammo.y, ammoWidth, ammoHeight);
+            });
+        }
+
+        function drawEnemies() {
+            enemyList.forEach(enemy => {
+                ctx.drawImage(enemyImage, enemy.x, enemy.y, enemyWidth, enemyHeight);
+            });
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            ammoList.forEach((ammo, index) => {
+                ammo.y -= ammoSpeed * Math.cos(ammo.angle);
+                ammo.x += ammoSpeed * Math.sin(ammo.angle);
+                if (ammo.y + ammoHeight < 0 || ammo.x + ammoWidth < 0 || ammo.x > canvas.width) {
+                    ammoList.splice(index, 1);
+                }
+            });
+
+            enemyList.forEach((enemy, index) => {
+                enemy.y += enemySpeed;
+                if (enemy.y > canvas.height) {
+                    enemyList.splice(index, 1);
+                    score -= 1; // Decrease score if enemy reaches the bottom
+                }
+
+                // Check for collision with player
+                if (
+                    enemy.x < playerX + playerWidth &&
+                    enemy.x + enemyWidth > playerX &&
+                    enemy.y < playerY + playerHeight &&
+                    enemy.y + enemyHeight > playerY
+                ) {
+                    gameOver = true;
+                    showGameOverScreen();
+                }
+            });
+
+            // Infinite pierce ammo - remove ammo on hit
+            ammoList.forEach((ammo, ammoIndex) => {
+                enemyList.forEach((enemy, enemyIndex) => {
+                    if (ammo.x < enemy.x + enemyWidth &&
+                        ammo.x + ammoWidth > enemy.x &&
+                        ammo.y < enemy.y + enemyHeight &&
+                        ammo.y + ammoHeight > enemy.y) {
+                        enemyList.splice(enemyIndex, 1);
+                        ammoList.splice(ammoIndex, 1); // Remove ammo after hit
+                        score += 1; // Increase score on hit
+                    }
+                });
+            });
+
+            // Spawn new enemies
+            spawnEnemy();
+        }
+
+        function fireAmmo() {
+            if (gameOver) return;
+
+            const angles = [-0.5, -0.25, 0, 0.25, 0.5]; // Different angles for spread
+            angles.forEach(angle => {
+                ammoList.push({ x: playerX + playerWidth / 2 - ammoWidth / 2, y: playerY, angle: angle });
+            });
+            shootingSound.play();
+        }
+
+        function spawnEnemy() {
+            for (let i = 0; i < enemiesPerSpawn; i++) {
+                const x = Math.random() * (canvas.width - enemyWidth);
+                const y = -enemyHeight;
+                enemyList.push({ x, y });
+            }
+        }
+
+        function draw() {
+            if (gameOver) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            drawAmmo();
+            drawEnemies();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (!gameOver) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function showGameOverScreen() {
+            gameOverScreen.style.display = 'block';
+            backgroundMusic.pause();
+        }
+
+        function increaseDifficulty() {
+            enemySpeed += 0.2; // Increase enemy speed
+            enemiesPerSpawn += 1; // Increase the number of enemies per spawn
+            if (enemySpawnInterval > 500) {
+                enemySpawnInterval -= 100; // Decrease spawn interval, but not too fast
+                clearInterval(spawnInterval);
+                spawnInterval = setInterval(spawnEnemy, enemySpawnInterval);
+            }
+        }
+
+        playerImage.onload = function() {
+            gameLoop();
+        };
+
+        // Adjust canvas size on window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            playerX = (canvas.width - playerWidth) / 2;
+        });
+
+        // Automatic shooting
+        setInterval(fireAmmo, 500);
+
+        // Spawn enemies at intervals
+        let spawnInterval = setInterval(spawnEnemy, enemySpawnInterval);
+
+        // Increase difficulty over time
+        setInterval(increaseDifficulty, 10000); // Every 10 seconds
+    </script>
+</body>
+</html>
